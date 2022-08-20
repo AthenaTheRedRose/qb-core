@@ -87,6 +87,7 @@ function QBCore.Player.CheckPlayerData(source, PlayerData)
     PlayerData.charinfo.account = PlayerData.charinfo.account or QBCore.Functions.CreateAccountNumber()
     -- Metadata
     PlayerData.metadata = PlayerData.metadata or {}
+    PlayerData.metadata['health'] = PlayerData.metadata['health'] or 200
     PlayerData.metadata['hunger'] = PlayerData.metadata['hunger'] or 100
     PlayerData.metadata['thirst'] = PlayerData.metadata['thirst'] or 100
     PlayerData.metadata['stress'] = PlayerData.metadata['stress'] or 0
@@ -288,8 +289,15 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
         moneytype = moneytype:lower()
         amount = tonumber(amount)
         if amount < 0 then return end
-        if not self.PlayerData.money[moneytype] then return false end
-        self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] + amount
+        if moneytype == 'bank' then
+            local data = {}
+            data.amount = amount
+            data.message = reason
+            exports.pefcl:addBankBalance(self.PlayerData.source, data)
+        else
+            if not self.PlayerData.money[moneytype] then return false end
+            self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] + amount
+        end
 
         if not self.Offline then
             self.Functions.UpdatePlayerData()
@@ -304,63 +312,230 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
         end
 
         return true
+  end
+
+  function self.Functions.RemoveMoney(moneytype, amount, reason)
+    reason = reason or 'unknown'
+    moneytype = moneytype:lower()
+    amount = tonumber(amount)
+    if amount < 0 then return end
+    if not self.PlayerData.money[moneytype] then return false end
+    for _, mtype in pairs(QBCore.Config.Money.DontAllowMinus) do
+        if mtype == moneytype then
+            if (self.PlayerData.money[moneytype] - amount) < 0 then
+                return false
+            end
+        end
+        if moneytype == 'bank' then
+            if (exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data - amount) < 0 then
+                return false
+            end
+        end
+    end
+    if moneytype == 'bank' then
+        local data = {}
+        data.amount = amount
+        data.message = reason
+        exports.pefcl:removeBankBalance(self.PlayerData.source, data)
+    else
+        self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] - amount
+    end
+    if not self.Offline then
+        self.Functions.UpdatePlayerData()
+        if amount > 100000 then
+                TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'RemoveMoney', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') removed, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason, true)
+        else
+                TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'RemoveMoney', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') removed, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason)
+        end
+        TriggerClientEvent('hud:client:OnMoneyChange', self.PlayerData.source, moneytype, amount, true)
+        if moneytype == 'bank' then
+            TriggerClientEvent('qb-phone:client:RemoveBankMoney', self.PlayerData.source, amount)
+        end
     end
 
-    function self.Functions.RemoveMoney(moneytype, amount, reason)
-        reason = reason or 'unknown'
-        moneytype = moneytype:lower()
-        amount = tonumber(amount)
-        if amount < 0 then return end
+    return true
+  end
+
+  function self.Functions.SetMoney(moneytype, amount, reason)
+    moneytype = moneytype:lower()
+    amount = tonumber(amount)
+    if amount < 0 then return false end
+    if moneytype == 'bank' then
+        local data = {}
+        data.amount = amount
+        exports.pefcl:setBankBalance(self.PlayerData.source, data)
+        self.PlayerData.money[moneytype] = exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data or 0
+    else
         if not self.PlayerData.money[moneytype] then return false end
-        for _, mtype in pairs(QBCore.Config.Money.DontAllowMinus) do
-            if mtype == moneytype then
-                if (self.PlayerData.money[moneytype] - amount) < 0 then
-                    return false
+        self.PlayerData.money[moneytype] = amount
+    end
+
+    if not self.Offline then
+        self.Functions.UpdatePlayerData()
+        TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'SetMoney', 'green', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') set, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason)
+    end
+
+    return true
+end
+
+function self.Functions.GetMoney(moneytype)
+    if not moneytype then return false end
+    moneytype = moneytype:lower()
+    if moneytype == 'bank' then
+        self.PlayerData.money[moneytype] = exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data or 0
+        return exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data
+    end
+    return self.PlayerData.money[moneytype]
+end
+
+function self.Functions.SyncMoney() 
+    local money = exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data
+    self.PlayerData.money['bank'] = money
+if not self.Offline then
+    self.Functions.UpdatePlayerData()
+end
+end
+
+    function self.Functions.AddItem(item, amount, slot, info)
+        local totalWeight = QBCore.Player.GetTotalWeight(self.PlayerData.items)
+        local itemInfo = QBCore.Shared.Items[item:lower()]
+        if not itemInfo and not self.Offline then
+            TriggerClientEvent('QBCore:Notify', self.PlayerData.source, Lang:t('error.item_not_exist'), 'error')
+            return
+        end
+        amount = tonumber(amount)
+        slot = tonumber(slot) or QBCore.Player.GetFirstSlotByItem(self.PlayerData.items, item)
+        if itemInfo['type'] == 'weapon' and not info then
+            info = {
+                serie = tostring(QBCore.Shared.RandomInt(2) .. QBCore.Shared.RandomStr(3) .. QBCore.Shared.RandomInt(1) .. QBCore.Shared.RandomStr(2) .. QBCore.Shared.RandomInt(3) .. QBCore.Shared.RandomStr(4)),
+            }
+        end
+        if (totalWeight + (itemInfo['weight'] * amount)) <= QBCore.Config.Player.MaxWeight then
+            if (slot and self.PlayerData.items[slot]) and (self.PlayerData.items[slot].name:lower() == item:lower()) and (itemInfo['type'] == 'item' and not itemInfo['unique']) then
+                self.PlayerData.items[slot].amount = self.PlayerData.items[slot].amount + amount
+
+                if not self.Offline then
+                    self.Functions.UpdatePlayerData()
+                    TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'AddItem', 'green', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** got item: [slot:' .. slot .. '], itemname: ' .. self.PlayerData.items[slot].name .. ', added amount: ' .. amount .. ', new total amount: ' .. self.PlayerData.items[slot].amount)
+                end
+
+                return true
+            elseif not itemInfo['unique'] and slot or slot and self.PlayerData.items[slot] == nil then
+                self.PlayerData.items[slot] = { name = itemInfo['name'], amount = amount, info = info or '', label = itemInfo['label'], description = itemInfo['description'] or '', weight = itemInfo['weight'], type = itemInfo['type'], unique = itemInfo['unique'], useable = itemInfo['useable'], image = itemInfo['image'], shouldClose = itemInfo['shouldClose'], slot = slot, combinable = itemInfo['combinable'] }
+
+                if not self.Offline then
+                    self.Functions.UpdatePlayerData()
+                    TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'AddItem', 'green', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** got item: [slot:' .. slot .. '], itemname: ' .. self.PlayerData.items[slot].name .. ', added amount: ' .. amount .. ', new total amount: ' .. self.PlayerData.items[slot].amount)
+                end
+
+                return true
+            elseif itemInfo['unique'] or (not slot or slot == nil) or itemInfo['type'] == 'weapon' then
+                for i = 1, QBConfig.Player.MaxInvSlots, 1 do
+                    if self.PlayerData.items[i] == nil then
+                        self.PlayerData.items[i] = { name = itemInfo['name'], amount = amount, info = info or '', label = itemInfo['label'], description = itemInfo['description'] or '', weight = itemInfo['weight'], type = itemInfo['type'], unique = itemInfo['unique'], useable = itemInfo['useable'], image = itemInfo['image'], shouldClose = itemInfo['shouldClose'], slot = i, combinable = itemInfo['combinable'] }
+
+                        if not self.Offline then
+                            self.Functions.UpdatePlayerData()
+                            TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'AddItem', 'green', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** got item: [slot:' .. i .. '], itemname: ' .. self.PlayerData.items[i].name .. ', added amount: ' .. amount .. ', new total amount: ' .. self.PlayerData.items[i].amount)
+                        end
+
+                        return true
+                    end
+                end
+            end
+        elseif not self.Offline then
+            TriggerClientEvent('QBCore:Notify', self.PlayerData.source, Lang:t('error.too_heavy'), 'error')
+        end
+        return false
+    end
+
+    function self.Functions.RemoveItem(item, amount, slot)
+        amount = tonumber(amount)
+        slot = tonumber(slot)
+        if slot then
+            if self.PlayerData.items[slot].amount > amount then
+                self.PlayerData.items[slot].amount = self.PlayerData.items[slot].amount - amount
+
+                if not self.Offline then
+                    self.Functions.UpdatePlayerData()
+                    TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'RemoveItem', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** lost item: [slot:' .. slot .. '], itemname: ' .. self.PlayerData.items[slot].name .. ', removed amount: ' .. amount .. ', new total amount: ' .. self.PlayerData.items[slot].amount)
+                end
+
+                return true
+            elseif self.PlayerData.items[slot].amount == amount then
+                self.PlayerData.items[slot] = nil
+
+                if not self.Offline then
+                    self.Functions.UpdatePlayerData()
+                    TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'RemoveItem', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** lost item: [slot:' .. slot .. '], itemname: ' .. item .. ', removed amount: ' .. amount .. ', item removed')
+                end
+
+                return true
+            end
+        else
+            local slots = QBCore.Player.GetSlotsByItem(self.PlayerData.items, item)
+            local amountToRemove = amount
+            if slots then
+                for _, _slot in pairs(slots) do
+                    if self.PlayerData.items[_slot].amount > amountToRemove then
+                        self.PlayerData.items[_slot].amount = self.PlayerData.items[_slot].amount - amountToRemove
+
+                        if not self.Offline then
+                            self.Functions.UpdatePlayerData()
+                            TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'RemoveItem', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** lost item: [slot:' .. _slot .. '], itemname: ' .. self.PlayerData.items[_slot].name .. ', removed amount: ' .. amount .. ', new total amount: ' .. self.PlayerData.items[_slot].amount)
+                        end
+
+                        return true
+                    elseif self.PlayerData.items[_slot].amount == amountToRemove then
+                        self.PlayerData.items[_slot] = nil
+
+                        if not self.Offline then
+                            self.Functions.UpdatePlayerData()
+                            TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'RemoveItem', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** lost item: [slot:' .. _slot .. '], itemname: ' .. item .. ', removed amount: ' .. amount .. ', item removed')
+                        end
+
+                        return true
+                    end
                 end
             end
         end
-        self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] - amount
+        return false
+    end
+
+    function self.Functions.SetInventory(items, dontUpdateChat)
+        self.PlayerData.items = items
+
+        if not self.Offline then
+            self.Functions.UpdatePlayerData(dontUpdateChat)
+            TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'SetInventory', 'blue', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** items set: ' .. json.encode(items))
+        end
+    end
+
+    function self.Functions.ClearInventory()
+        self.PlayerData.items = {}
 
         if not self.Offline then
             self.Functions.UpdatePlayerData()
-            if amount > 100000 then
-                TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'RemoveMoney', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') removed, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason, true)
-            else
-                TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'RemoveMoney', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') removed, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason)
-            end
-            TriggerClientEvent('hud:client:OnMoneyChange', self.PlayerData.source, moneytype, amount, true)
-            if moneytype == 'bank' then
-                TriggerClientEvent('qb-phone:client:RemoveBankMoney', self.PlayerData.source, amount)
-            end
-            TriggerClientEvent('QBCore:Client:OnMoneyChange', self.PlayerData.source, moneytype, amount, "remove")
-            TriggerEvent('QBCore:Server:OnMoneyChange', self.PlayerData.source, moneytype, amount, "remove")
+            TriggerEvent('qb-log:server:CreateLog', 'playerinventory', 'ClearInventory', 'red', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** inventory cleared')
         end
-
-        return true
     end
 
-    function self.Functions.SetMoney(moneytype, amount, reason)
-        reason = reason or 'unknown'
-        moneytype = moneytype:lower()
-        amount = tonumber(amount)
-        if amount < 0 then return false end
-        if not self.PlayerData.money[moneytype] then return false end
-        self.PlayerData.money[moneytype] = amount
-
-        if not self.Offline then
-            self.Functions.UpdatePlayerData()
-            TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'SetMoney', 'green', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') set, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason)
-            TriggerClientEvent('QBCore:Client:OnMoneyChange', self.PlayerData.source, moneytype, amount, "set")
-            TriggerEvent('QBCore:Server:OnMoneyChange', self.PlayerData.source, moneytype, amount, "set")
-        end
-
-        return true
+    function self.Functions.GetItemByName(item)
+        item = tostring(item):lower()
+        local slot = QBCore.Player.GetFirstSlotByItem(self.PlayerData.items, item)
+        return self.PlayerData.items[slot]
     end
 
-    function self.Functions.GetMoney(moneytype)
-        if not moneytype then return false end
-        moneytype = moneytype:lower()
-        return self.PlayerData.money[moneytype]
+    function self.Functions.GetItemsByName(item)
+        item = tostring(item):lower()
+        local items = {}
+        local slots = QBCore.Player.GetSlotsByItem(self.PlayerData.items, item)
+        for _, slot in pairs(slots) do
+            if slot then
+                items[#items+1] = self.PlayerData.items[slot]
+            end
+        end
+        return items
     end
 
     function self.Functions.SetCreditCard(cardNumber)
@@ -370,7 +545,7 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
 
     function self.Functions.GetCardSlot(cardNumber, cardType)
         local item = tostring(cardType):lower()
-        local slots = exports['qb-inventory']:GetSlotsByItem(self.PlayerData.items, item)
+        local slots = QBCore.Player.GetSlotsByItem(self.PlayerData.items, item)
         for _, slot in pairs(slots) do
             if slot then
                 if self.PlayerData.items[slot].info.cardNumber == cardNumber then
@@ -379,6 +554,11 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
             end
         end
         return nil
+    end
+
+    function self.Functions.GetItemBySlot(slot)
+        slot = tonumber(slot)
+        return self.PlayerData.items[slot]
     end
 
     function self.Functions.Save()
@@ -539,26 +719,67 @@ function QBCore.Player.DeleteCharacter(source, citizenid)
     local result = MySQL.scalar.await('SELECT license FROM players where citizenid = ?', { citizenid })
     if license == result then
         local query = "DELETE FROM %s WHERE citizenid = ?"
-        local tableCount = #playertables
-        local queries = table.create(tableCount, 0)
+		local tableCount = #playertables
+		local queries = table.create(tableCount, 0)
 
-        for i = 1, tableCount do
-            local v = playertables[i]
-            queries[i] = {query = query:format(v.table), values = { citizenid }}
-        end
+		for i = 1, tableCount do
+			local v = playertables[i]
+			queries[i] = {query = query:format(v.table), values = { citizenid }}
+		end
 
         MySQL.transaction(queries, function(result2)
-            if result2 then
-                TriggerEvent('qb-log:server:CreateLog', 'joinleave', 'Character Deleted', 'red', '**' .. GetPlayerName(source) .. '** ' .. license .. ' deleted **' .. citizenid .. '**..')
+			if result2 then
+				TriggerEvent('qb-log:server:CreateLog', 'joinleave', 'Character Deleted', 'red', '**' .. GetPlayerName(source) .. '** ' .. license .. ' deleted **' .. citizenid .. '**..')
             end
-        end)
+		end)
     else
         DropPlayer(source, 'You Have Been Kicked For Exploitation')
         TriggerEvent('qb-log:server:CreateLog', 'anticheat', 'Anti-Cheat', 'white', GetPlayerName(source) .. ' Has Been Dropped For Character Deletion Exploit', true)
     end
 end
 
--- Inventory Backwards Compatibility
+-- Inventory
+
+function QBCore.Player.LoadInventory(PlayerData)
+    PlayerData.items = {}
+    local inventory = MySQL.prepare.await('SELECT inventory FROM players WHERE citizenid = ?', { PlayerData.citizenid })
+    local missingItems = {}
+    if inventory then
+        inventory = json.decode(inventory)
+        if next(inventory) then
+            for _, item in pairs(inventory) do
+                if item then
+                    local itemInfo = QBCore.Shared.Items[item.name:lower()]
+                    if itemInfo then
+                        PlayerData.items[item.slot] = {
+                            name = itemInfo['name'],
+                            amount = item.amount,
+                            info = item.info or '',
+                            label = itemInfo['label'],
+                            description = itemInfo['description'] or '',
+                            weight = itemInfo['weight'],
+                            type = itemInfo['type'],
+                            unique = itemInfo['unique'],
+                            useable = itemInfo['useable'],
+                            image = itemInfo['image'],
+                            shouldClose = itemInfo['shouldClose'],
+                            slot = item.slot,
+                            combinable = itemInfo['combinable']
+                        }
+                    else
+                        missingItems[#missingItems+1] = item.name:lower()
+                    end
+
+                end
+            end
+        end
+    end
+
+    if #missingItems > 0 then
+        print(("%s the following items removed as they no longer exist: %s"):format(GetPlayerName(PlayerData.source), json.encode(missingItems)))
+    end
+    return PlayerData
+end
 
 function QBCore.Player.SaveInventory(source)
     if GetResourceState('qb-inventory') == 'missing' then return end

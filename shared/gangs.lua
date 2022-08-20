@@ -115,5 +115,24 @@ QBShared.Gangs = {
 				isboss = true
             },
         },
+	},
+	['sinistersouls'] = {
+		label = 'Sinister Souls',
+		grades = {
+            ['0'] = {
+                name = 'Recruit'
+            },
+			['1'] = {
+                name = 'Member'
+            },
+			['2'] = {
+                name = 'Captain'
+            },
+			['3'] = {
+                name = 'Boss',
+				isboss = true
+            },
+        },
 	}
+
 }

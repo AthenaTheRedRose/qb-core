@@ -15,35 +15,64 @@ QBShared.Jobs = {
 	['police'] = {
 		label = 'Law Enforcement',
         type = "leo",
-		defaultDuty = true,
+		defaultDuty = false,
 		offDutyPay = false,
 		grades = {
             ['0'] = {
-                name = 'Recruit',
+                name = 'Cadet',
                 payment = 50
             },
 			['1'] = {
                 name = 'Officer',
-                payment = 75
+                payment = 60
             },
-			['2'] = {
-                name = 'Sergeant',
-                payment = 100
+            ['2'] = {
+                name = 'Senior Officer',
+                payment = 70
             },
 			['3'] = {
-                name = 'Lieutenant',
-                payment = 125
+                name = 'Sergeant',
+                payment =80 
             },
 			['4'] = {
-                name = 'Chief',
+                name = 'Lieutenant',
+                payment = 95
+            },
+			['5'] = {
+                name = 'Captain',
+				isboss = true,
+                payment = 110
+            },
+            ['6'] = {
+                name = 'Commander',
+				isboss = true,
+                payment = 135
+            },
+            ['7'] = {
+                name = 'Deputy Chief',
 				isboss = true,
                 payment = 150
+            },
+            ['8'] = {
+                name = 'Assistant Chief',
+				isboss = true,
+                payment = 170
+            },
+            ['9'] = {
+                name = 'Chief',
+				isboss = true,
+                payment = 190
+            },
+            ['10'] = {
+                name = 'Commissioner',
+				isboss = true,
+                payment = 200
             },
         },
 	},
 	['ambulance'] = {
 		label = 'EMS',
-		defaultDuty = true,
+		defaultDuty = false,
 		offDutyPay = false,
 		grades = {
             ['0'] = {
@@ -280,4 +309,95 @@ QBShared.Jobs = {
             },
         },
 	},
-}
+    ['burgershot'] = {
+		label = 'BurgerShot',
+		defaultDuty = false,
+		offDutyPay = false,
+		grades = {
+            ['0'] = {
+                name = 'Trainee',
+                payment = 50
+            },
+            ['1'] = {
+                name = 'Employee',
+                payment = 50
+            },
+            ['2'] = {
+                name = 'Manager',
+                isBoss = true,
+                payment = 50
+            },
+        }
+     },
+     ['callistohotel'] = {
+		label = 'Callisto Hotel',
+		defaultDuty = false,
+		offDutyPay = false,
+		grades = {
+            ['0'] = {
+                name = 'Trainee',
+                payment = 50
+            },
+            ['1'] = {
+                name = 'Employee',
+                payment = 50
+            },
+            ['2'] = {
+                name = 'Manager',
+                isBoss = true,
+                payment = 50
+            },
+        }
+     },
+     ['triadrecords'] = {
+		label = 'Triad Records',
+		defaultDuty = false,
+		offDutyPay = false,
+		grades = {
+            ['0'] = {
+                name = 'Talent',
+                payment = 10
+            },
+            ['1'] = {
+                name = 'Employee',
+                payment = 50
+            },
+            ['2'] = {
+                name = 'CEO',
+                isBoss = true,
+                payment = 100
+            },
+        }
+     },
+     ['recordastudio'] = {
+		label = 'Record A Studios',
+		defaultDuty = false,
+		offDutyPay = false,
+		grades = {
+            ['0'] = {
+                name = 'Talent',
+                payment = 10
+            },
+            ['1'] = {
+                name = 'Employee',
+                payment = 50
+            },
+            ['2'] = {
+                name = 'CEO',
+                isBoss = true,
+                payment = 100
+            },
+        }
+     },
+     ['lumberjack'] = {
+		label = 'LumberJack',
+		defaultDuty = true,
+		offDutyPay = false,
+		grades = {
+            ['0'] = {
+                name = 'Logger',
+                payment = 50
+            },
+        },
+	},
+    }

@@ -31,7 +31,7 @@ function QBShared.SplitStr(str, delimiter)
 end
 
 function QBShared.Trim(value)
-    if not value then return nil end
+	if not value then return nil end
     return (string.gsub(value, '^%s*(.-)%s*$', '%1'))
 end
 
@@ -42,19 +42,19 @@ function QBShared.Round(value, numDecimalPlaces)
 end
 
 function QBShared.ChangeVehicleExtra(vehicle, extra, enable)
-    if DoesExtraExist(vehicle, extra) then
-        if enable then
-            SetVehicleExtra(vehicle, extra, false)
-            if not IsVehicleExtraTurnedOn(vehicle, extra) then
-                QBShared.ChangeVehicleExtra(vehicle, extra, enable)
-            end
-        else
-            SetVehicleExtra(vehicle, extra, true)
-            if IsVehicleExtraTurnedOn(vehicle, extra) then
-                QBShared.ChangeVehicleExtra(vehicle, extra, enable)
-            end
-        end
-    end
+	if DoesExtraExist(vehicle, extra) then
+		if enable then
+			SetVehicleExtra(vehicle, extra, false)
+			if not IsVehicleExtraTurnedOn(vehicle, extra) then
+				QBShared.ChangeVehicleExtra(vehicle, extra, enable)
+			end
+		else
+			SetVehicleExtra(vehicle, extra, true)
+			if IsVehicleExtraTurnedOn(vehicle, extra) then
+				QBShared.ChangeVehicleExtra(vehicle, extra, enable)
+			end
+		end
+	end
 end
 
 function QBShared.SetDefaultVehicleExtras(vehicle, config)

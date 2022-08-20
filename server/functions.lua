@@ -199,6 +199,7 @@ function QBCore.Functions.CreateVehicle(source, model, coords, warp)
 end
 
 -- Paychecks (standalone - don't touch)
+
 function PaycheckInterval()
     if next(QBCore.Players) then
         for _, Player in pairs(QBCore.Players) do
@@ -426,7 +427,7 @@ end
 function QBCore.Functions.HasItem(source, items, amount)
     if GetResourceState('qb-inventory') == 'missing' then return end
     return exports['qb-inventory']:HasItem(source, items, amount)
-end
+    end
 
 function QBCore.Functions.Notify(source, text, type, length)
     TriggerClientEvent('QBCore:Notify', source, text, type, length)

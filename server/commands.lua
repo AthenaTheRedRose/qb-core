@@ -15,7 +15,7 @@ end)
 
 -- Register & Refresh Commands
 
-function QBCore.Commands.Add(name, help, arguments, argsrequired, callback, permission, ...)
+function QBCore.Commands.Add(name, help, arguments, argsrequired, callback, permission)
     local restricted = true -- Default to restricted for all commands
     if not permission then permission = 'user' end -- some commands don't pass permission level
     if permission == 'user' then restricted = false end -- allow all users to use command
@@ -44,9 +44,9 @@ function QBCore.Commands.Add(name, help, arguments, argsrequired, callback, perm
         permission.n = nil
     else
         permission = tostring(permission:lower())
-        if not QBCore.Commands.IgnoreList[permission] then -- only create aces for extra perm levels
-            ExecuteCommand(('add_ace qbcore.%s command.%s allow'):format(permission, name))
-        end
+    if not QBCore.Commands.IgnoreList[permission] then -- only create aces for extra perm levels
+        ExecuteCommand(('add_ace qbcore.%s command.%s allow'):format(permission, name))
+    end
     end
 
     QBCore.Commands.List[name:lower()] = {
@@ -84,14 +84,14 @@ end
 QBCore.Commands.Add('tp', 'TP To Location/Player/Coords (Admin Only)', { { name = 'location/id/x', help = 'location name, ID of player, or X position' }, { name = 'y', help = 'Y position' }, { name = 'z', help = 'Z position' } }, false, function(source, args)
     if args[1] and not args[2] and not args[3] then
         if tonumber(args[1]) then
-            local target = GetPlayerPed(tonumber(args[1]))
-            if target ~= 0 then
-                local coords = GetEntityCoords(target)
-                TriggerClientEvent('QBCore:Command:TeleportToPlayer', source, coords)
-            else
-                TriggerClientEvent('QBCore:Notify', source, Lang:t('error.not_online'), 'error')
-            end
+        local target = GetPlayerPed(tonumber(args[1]))
+        if target ~= 0 then
+            local coords = GetEntityCoords(target)
+            TriggerClientEvent('QBCore:Command:TeleportToPlayer', source, coords)
         else
+            TriggerClientEvent('QBCore:Notify', source, Lang:t('error.not_online'), 'error')
+        end
+    else
             local location = QBShared.Locations[args[1]]
             if location then
                 TriggerClientEvent('QBCore:Command:TeleportToCoords', source, location.x, location.y, location.z, location.w)

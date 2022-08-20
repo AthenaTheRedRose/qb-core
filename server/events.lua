@@ -10,11 +10,13 @@ end)
 AddEventHandler('playerDropped', function(reason)
     local src = source
     if not QBCore.Players[src] then return end
-    local Player = QBCore.Players[src]
+        local Player = QBCore.Players[src]
     TriggerEvent('qb-log:server:CreateLog', 'joinleave', 'Dropped', 'red', '**' .. GetPlayerName(src) .. '** (' .. Player.PlayerData.license .. ') left..' ..'\n **Reason:** ' .. reason)
-    Player.Functions.Save()
+        Player.Functions.Save()
     QBCore.Player_Buckets[Player.PlayerData.license] = nil
-    QBCore.Players[src] = nil
+        QBCore.Players[src] = nil
+        Player.Functions.SetMetaData('health', health)
+        Player.Functions.SetMetaData('armor', armor)
 end)
 
 -- Player Connecting
@@ -66,7 +68,7 @@ local function onPlayerConnecting(name, _, deferrals)
       deferrals.done(Lang:t('error.not_whitelisted'))
     end
 
-    deferrals.done()
+        deferrals.done()
 
     -- Add any additional defferals you may need!
 end
@@ -219,7 +221,7 @@ QBCore.Functions.CreateCallback('QBCore:Server:SpawnVehicle', function(source, c
             Wait(0)
             TaskWarpPedIntoVehicle(ped, veh, -1)
         end
-    end
+	end
     while NetworkGetEntityOwner(veh) ~= source do Wait(0) end
     cb(NetworkGetNetworkIdFromEntity(veh))
 end)
